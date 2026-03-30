@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kalkulator Pricing Gabor-Granger</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#0D6E4F',
+                        highlight: '#2FC898',
+                        neutral: '#64748b',
+                        accent: '#1B4F72',
+                        danger: '#e11d48',
+                        warning: '#f59e0b',
+                        surface: '#F0F4F8',
+                        card: '#FFFFFF',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background-color: #EEF2F7;
+            background-image:
+                radial-gradient(ellipse at 20% 10%, rgba(13,110,79,0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(27,79,114,0.05) 0%, transparent 50%);
+            min-height: 100vh;
+        }
+
+        /* --- Scrollbar --- */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #c5d1de; border-radius: 99px; }
+
+        /* --- Nav --- */
+        .navbar {
+            background: linear-gradient(135deg, #0D6E4F 0%, #0a5a40 60%, #1B4F72 100%);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+
+        /* --- Cards --- */
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.04);
+            border: 1px solid rgba(203,213,225,0.7);
+            transition: box-shadow 0.2s ease;
+        }
+        .card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.06); }
+
+        /* --- Stat Cards --- */
+        .stat-card {
+            border-radius: 16px;
+            border: 1px solid rgba(203,213,225,0.6);
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+        }
+        .stat-card.revenue::before { background: linear-gradient(90deg, #1B4F72, #2980B9); }
+        .stat-card.profit::before { background: linear-gradient(90deg, #0D6E4F, #2FC898); }
+        .stat-card.acceptance::before { background: linear-gradient(90deg, #7B2D8B, #C471ED); }
+        .stat-card.elasticity::before { background: linear-gradient(90deg, #C0392B, #E74C3C); }
+
+        /* --- Section Labels --- */
+        .section-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #94a3b8;
+        }
+
+        /* --- Input Cells --- */
+        .input-cell {
+            width: 100%;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0.35rem 0.5rem;
+            text-align: right;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.82rem;
+            color: #1e293b;
+            background: #f8fafc;
+            transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+        }
+        .input-cell:focus {
+            outline: none;
+            border-color: #0D6E4F;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(13,110,79,0.1);
+        }
+        .input-cell.readonly {
+            background: #f1f5f9;
+            color: #94a3b8;
+            cursor: not-allowed;
+            border-color: transparent;
+        }
+
+        /* --- Form Inputs --- */
+        .form-input {
+            width: 100%;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 0.6rem 0.875rem;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.9rem;
+            color: #1e293b;
+            background: #f8fafc;
+            transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #0D6E4F;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(13,110,79,0.1);
+        }
+
+        /* --- Buttons --- */
+        .btn-primary {
+            background: linear-gradient(135deg, #0D6E4F, #0a5a40);
+            color: #fff;
+            border-radius: 10px;
+            padding: 0.6rem 1rem;
+            font-weight: 600;
+            font-size: 0.875rem;
+            width: 100%;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+            box-shadow: 0 2px 8px rgba(13,110,79,0.25);
+        }
+        .btn-primary:hover { opacity: 0.92; box-shadow: 0 4px 14px rgba(13,110,79,0.3); transform: translateY(-1px); }
+        .btn-primary:active { transform: translateY(0); }
+
+        .btn-dashed {
+            width: 100%;
+            padding: 0.6rem;
+            border: 1.5px dashed #cbd5e1;
+            border-radius: 10px;
+            color: #94a3b8;
+            background: transparent;
+            font-weight: 500;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: border-color 0.15s, color 0.15s, background 0.15s;
+        }
+        .btn-dashed:hover { border-color: #0D6E4F; color: #0D6E4F; background: rgba(13,110,79,0.04); }
+
+        /* --- Table --- */
+        .data-table thead th {
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.07em;
+            text-transform: uppercase;
+            color: #94a3b8;
+            padding: 0.6rem 0.5rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .data-table tbody tr {
+            border-bottom: 1px solid #f8fafc;
+            transition: background 0.1s;
+        }
+        .data-table tbody tr:hover { background: #fafcff; }
+        .data-table tbody td { padding: 0.45rem 0.5rem; }
+
+        /* --- Tag / Badge --- */
+        .badge {
+            display: inline-block;
+            border-radius: 99px;
+            padding: 0.18rem 0.65rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+        }
+        .badge-green { background: rgba(13,110,79,0.1); color: #0D6E4F; }
+        .badge-blue { background: rgba(27,79,114,0.1); color: #1B4F72; }
+        .badge-amber { background: rgba(245,158,11,0.12); color: #b45309; }
+
+        /* --- Chart container --- */
+        .chart-wrapper { position: relative; width: 100%; }
+
+        /* --- Insight box --- */
+        .insight-box {
+            background: linear-gradient(135deg, #f0fdf6, #f0f7ff);
+            border: 1px solid #c6f0e2;
+            border-radius: 12px;
+            padding: 1rem 1.125rem;
+        }
+
+        /* --- Methodology card --- */
+        .method-card {
+            background: #fafbfc;
+            border: 1px solid #e8ecf0;
+            border-radius: 12px;
+        }
+
+        /* Icon circle */
+        .icon-circle {
+            width: 44px; height: 44px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* Monospace value display */
+        .mono-value {
+            font-family: 'DM Mono', monospace;
+            font-weight: 500;
+        }
+
+        /* Animate in */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-up { animation: fadeUp 0.4s ease both; }
+        .fade-up-1 { animation-delay: 0.05s; }
+        .fade-up-2 { animation-delay: 0.1s; }
+        .fade-up-3 { animation-delay: 0.15s; }
+        .fade-up-4 { animation-delay: 0.2s; }
+
+        /* Toast */
+        #toast {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px);
+            background: #1e293b; color: #fff;
+            padding: 0.65rem 1.25rem; border-radius: 99px;
+            font-size: 0.85rem; font-weight: 500;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+            transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.3s;
+            opacity: 0; pointer-events: none; z-index: 9999;
+        }
+        #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    </style>
+</head>
+<body class="text-slate-800 pb-16">
+
+    <!-- Toast -->
+    <div id="toast"></div>
+
+    <!-- Navbar -->
+    <nav class="navbar text-white py-4 px-6 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-white/15 rounded-xl p-2 backdrop-blur-sm">
+                    <i class="fas fa-chart-line text-lg text-white/90"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold leading-tight tracking-tight">Analisis Harga: Gabor-Granger</h1>
+                    <p class="text-xs text-white/55 font-medium">Optimisasi Revenue & Profit</p>
+                </div>
+            </div>
+            <div class="hidden sm:flex items-center gap-2">
+                <span class="badge bg-white/15 text-white/80 text-xs px-3 py-1 rounded-full font-medium">
+                    <i class="fas fa-circle text-green-400 mr-1.5" style="font-size:7px;vertical-align:middle"></i>
+                    Live Calc
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto mt-7 px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- ===== LEFT PANEL ===== -->
+        <div class="lg:col-span-1 space-y-5">
+
+            <!-- Bulk Input -->
+            <div class="card p-5 fade-up fade-up-1">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="icon-circle bg-slate-100 text-slate-500">
+                        <i class="fas fa-paste text-base"></i>
+                    </div>
+                    <div>
+                        <p class="section-label">Input</p>
+                        <h2 class="text-sm font-bold text-slate-700">Paste Data Mentah</h2>
+                    </div>
+                </div>
+                <p class="text-xs text-neutral leading-relaxed mb-3">
+                    Copy data skala niat beli (1–5) dari Excel — Baris = responden, Kolom = titik harga — lalu paste di bawah.
+                </p>
+                <textarea id="bulkInput" rows="4"
+                    class="w-full border border-slate-200 rounded-xl p-3 text-xs font-mono focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 mb-3 bg-slate-50 resize-none transition-all"
+                    placeholder="Contoh (copy dari Excel):&#10;4&#9;3&#9;2&#9;1&#9;1&#10;5&#9;4&#9;3&#9;2&#9;1"></textarea>
+                <button onclick="processBulkData()" class="btn-primary">
+                    <i class="fas fa-bolt mr-1.5"></i> Proses Data Sekaligus
+                </button>
+            </div>
+
+            <!-- Profit Settings -->
+            <div class="card p-5 fade-up fade-up-2">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="icon-circle bg-emerald-50 text-primary">
+                        <i class="fas fa-sliders-h text-base"></i>
+                    </div>
+                    <div>
+                        <p class="section-label">Parameter</p>
+                        <h2 class="text-sm font-bold text-slate-700">Pengaturan Profit</h2>
+                    </div>
+                </div>
+                <p class="text-xs text-neutral leading-relaxed mb-4">
+                    Masukkan biaya variabel & ukuran pasar. Profit = (Harga − Biaya) × Volume.
+                </p>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Biaya Variabel per Unit (Rp)</label>
+                        <input type="number" id="varCost" class="form-input" value="500" onchange="calculateAndDraw()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5">Estimasi Total Target Pasar</label>
+                        <input type="number" id="marketSize" class="form-input" value="10000" onchange="calculateAndDraw()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="card p-5 fade-up fade-up-3">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="icon-circle bg-blue-50 text-accent">
+                        <i class="fas fa-table-cells text-base"></i>
+                    </div>
+                    <div>
+                        <p class="section-label">Dataset</p>
+                        <h2 class="text-sm font-bold text-slate-700">Titik Harga</h2>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto -mx-1">
+                    <table class="w-full data-table" id="dataTable">
+                        <thead>
+                            <tr>
+                                <th class="text-left">Harga (Rp)</th>
+                                <th class="text-right">Prob (%)</th>
+                                <th class="text-right" title="Kalibrasi Logit">Logit</th>
+                                <th class="text-right" title="Standar Deviasi Koridor">±Koridor</th>
+                                <th class="text-center w-8"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+
+                <button onclick="addRow()" class="btn-dashed mt-4">
+                    <i class="fas fa-plus mr-1.5"></i> Tambah Titik Harga
+                </button>
+            </div>
+
+            <!-- Methodology Note -->
+            <div class="method-card p-5 fade-up fade-up-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <i class="fas fa-lightbulb text-amber-400"></i>
+                    <h3 class="text-sm font-bold text-slate-700">Catatan Metodologi</h3>
+                </div>
+                <p class="text-xs text-neutral leading-relaxed mb-3">
+                    Gabor-Granger ideal untuk fitur produk yang sudah <strong class="text-slate-600">fixed</strong>. Ada dua bias perilaku yang saling mengimbangi:
+                </p>
+                <div class="space-y-2">
+                    <div class="flex items-start gap-2.5 bg-red-50/60 rounded-lg px-3 py-2">
+                        <i class="fas fa-arrow-trend-down text-red-400 mt-0.5 text-xs flex-shrink-0"></i>
+                        <p class="text-xs text-slate-600 leading-snug">
+                            <strong>Understatement WTP:</strong> Responden sengaja merendahkan willingness to pay.
+                        </p>
+                    </div>
+                    <div class="flex items-start gap-2.5 bg-emerald-50/60 rounded-lg px-3 py-2">
+                        <i class="fas fa-arrow-trend-up text-emerald-500 mt-0.5 text-xs flex-shrink-0"></i>
+                        <p class="text-xs text-slate-600 leading-snug">
+                            <strong>Overstatement purchase:</strong> Niat beli berlebih — dimitigasi lewat konversi konservatif (Skala 5→60%, 4→40%, dst).
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== RIGHT PANEL ===== -->
+        <div class="lg:col-span-2 space-y-5">
+
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-2 gap-4 fade-up fade-up-1">
+
+                <!-- Revenue Optimal -->
+                <div class="stat-card revenue card p-5">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="section-label mb-1.5">Harga Optimal — Pendapatan</p>
+                            <h3 class="text-xl font-bold text-slate-800 mono-value truncate" id="optimalPriceRev">Rp 0</h3>
+                            <p class="text-xs text-accent mt-1 mono-value font-medium truncate" id="maxRevenue">Rp 0 Total</p>
+                        </div>
+                        <div class="icon-circle bg-accent/8 flex-shrink-0" style="background:rgba(27,79,114,0.08)">
+                            <i class="fas fa-money-bill-wave text-accent text-base"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profit Optimal -->
+                <div class="stat-card profit card p-5">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="section-label mb-1.5">Harga Optimal — Profit</p>
+                            <h3 class="text-xl font-bold text-slate-800 mono-value truncate" id="optimalPriceProf">Rp 0</h3>
+                            <p class="text-xs text-primary mt-1 mono-value font-medium truncate" id="maxProfit">Rp 0 Total</p>
+                        </div>
+                        <div class="icon-circle flex-shrink-0" style="background:rgba(13,110,79,0.08)">
+                            <i class="fas fa-seedling text-primary text-base"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Acceptance at Optimal Rev Price -->
+                <div class="stat-card acceptance card p-5">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="section-label mb-1.5">Penerimaan pada Harga Rev</p>
+                            <h3 class="text-xl font-bold text-slate-800 mono-value" id="optimalAcceptance">0%</h3>
+                            <p class="text-xs text-slate-400 mt-1">Probabilitas pembelian</p>
+                        </div>
+                        <div class="icon-circle flex-shrink-0" style="background:rgba(123,45,139,0.08)">
+                            <i class="fas fa-users text-purple-600 text-base"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Elasticity Estimate -->
+                <div class="stat-card elasticity card p-5">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="section-label mb-1.5">Estimasi Elastisitas</p>
+                            <h3 class="text-xl font-bold text-slate-800 mono-value" id="elasticityVal">0.00</h3>
+                            <p class="text-xs text-slate-400 mt-1" id="elasticityLabel">Inelastis</p>
+                        </div>
+                        <div class="icon-circle flex-shrink-0" style="background:rgba(220,38,38,0.07)">
+                            <i class="fas fa-wave-square text-red-500 text-base"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Combined Chart -->
+            <div class="card p-6 fade-up fade-up-2">
+                <div class="flex items-center justify-between gap-3 mb-5">
+                    <div class="flex items-center gap-3">
+                        <div class="icon-circle bg-slate-100 text-slate-500">
+                            <i class="fas fa-chart-area text-base"></i>
+                        </div>
+                        <div>
+                            <p class="section-label">Visualisasi</p>
+                            <h2 class="text-sm font-bold text-slate-700">Kurva Permintaan, Pendapatan & Profit</h2>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 flex-wrap justify-end">
+                        <span class="badge badge-blue"><i class="fas fa-square mr-1" style="font-size:8px"></i>Revenue</span>
+                        <span class="badge badge-green"><i class="fas fa-square mr-1" style="font-size:8px"></i>Profit</span>
+                        <span class="badge badge-amber"><i class="fas fa-minus mr-1"></i>Logit</span>
+                    </div>
+                </div>
+                <div class="chart-wrapper" style="height:340px">
+                    <canvas id="gaborChart"></canvas>
+                </div>
+                <div class="mt-4 insight-box">
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        <i class="fas fa-circle-info text-primary mr-1.5"></i>
+                        Harga yang memaksimalkan <strong>pendapatan</strong> dan <strong>profit bersih</strong> seringkali berbeda karena faktor biaya produksi. Gunakan harga profit-optimal jika margin menjadi prioritas strategis.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Sub Charts -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 fade-up fade-up-3">
+
+                <!-- Revenue Chart -->
+                <div class="card p-5">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-2 h-2 rounded-full bg-accent"></div>
+                        <h2 class="text-sm font-bold text-accent">Total Pendapatan</h2>
+                    </div>
+                    <div class="chart-wrapper" style="height:220px">
+                        <canvas id="revenueChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Profit Chart -->
+                <div class="card p-5">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-2 h-2 rounded-full bg-primary"></div>
+                        <h2 class="text-sm font-bold text-primary">Total Profit Bersih</h2>
+                    </div>
+                    <div class="chart-wrapper" style="height:220px">
+                        <canvas id="profitChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Toast helper -->
+    <script>
+        function showToast(msg, duration = 2800) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), duration);
+        }
+    </script>
+
+    <script>
+        let pricingData = [
+            { id: 1, price: 1000, probability: 43.1, margin: 2.5, logit: 0 },
+            { id: 2, price: 1200, probability: 26.6, margin: 4.7, logit: 0 },
+            { id: 3, price: 1400, probability: 13.5, margin: 4.7, logit: 0 },
+            { id: 4, price: 1600, probability: 4.5, margin: 1.7, logit: 0 },
+            { id: 5, price: 1800, probability: 2.7, margin: 0.7, logit: 0 }
+        ];
+
+        let chartInstance = null;
+        let revenueChartInstance = null;
+        let profitChartInstance = null;
+
+        function init() {
+            computeMath();
+            renderTable();
+            calculateAndDraw();
+        }
+
+        function computeMath() {
+            let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0, validCount = 0;
+            pricingData.forEach(d => {
+                let p = d.probability / 100;
+                if (p <= 0) p = 0.001;
+                if (p >= 1) p = 0.999;
+                let y = Math.log(p / (1 - p));
+                let x = d.price;
+                sumX += x; sumY += y; sumXY += x * y; sumXX += x * x; validCount++;
+            });
+            let slope = 0, intercept = 0;
+            if (validCount > 1) {
+                let mX = sumX / validCount, mY = sumY / validCount;
+                let num = sumXY - validCount * mX * mY;
+                let den = sumXX - validCount * mX * mX;
+                slope = den === 0 ? 0 : num / den;
+                intercept = mY - slope * mX;
+            }
+            pricingData.forEach(item => {
+                let yFit = intercept + slope * item.price;
+                item.logit = +(1 / (1 + Math.exp(-yFit)) * 100).toFixed(1);
+            });
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            pricingData.forEach((row, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-1.5 px-1">
+                        <input type="number" class="input-cell" value="${row.price}" min="0" max="999999"
+                            oninput="if(this.value.length>6)this.value=this.value.slice(0,6);"
+                            onchange="updateData(${index},'price',this.value)">
+                    </td>
+                    <td class="py-1.5 px-1">
+                        <input type="number" step="0.1" max="100" min="0" class="input-cell" value="${row.probability}"
+                            onchange="updateData(${index},'probability',this.value)">
+                    </td>
+                    <td class="py-1.5 px-1">
+                        <input type="number" readonly class="input-cell readonly" value="${row.logit}" title="Dihitung otomatis">
+                    </td>
+                    <td class="py-1.5 px-1">
+                        <input type="number" step="0.1" max="100" min="0" class="input-cell" value="${row.margin}"
+                            onchange="updateData(${index},'margin',this.value)">
+                    </td>
+                    <td class="py-1.5 px-1 text-center">
+                        <button onclick="removeRow(${index})"
+                            class="w-7 h-7 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors mx-auto"
+                            title="Hapus">
+                            <i class="fas fa-xmark text-xs"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateData(index, field, value) {
+            pricingData[index][field] = parseFloat(value) || 0;
+            pricingData.sort((a, b) => a.price - b.price);
+            computeMath();
+            renderTable();
+            calculateAndDraw();
+        }
+
+        function addRow() {
+            const newId = pricingData.length > 0 ? Math.max(...pricingData.map(d => d.id)) + 1 : 1;
+            const lastPrice = pricingData.length > 0 ? pricingData[pricingData.length - 1].price : 0;
+            const step = pricingData.length > 1
+                ? pricingData[pricingData.length - 1].price - pricingData[pricingData.length - 2].price
+                : 200;
+            pricingData.push({ id: newId, price: lastPrice + step, probability: 0, margin: 0, logit: 0 });
+            computeMath(); renderTable(); calculateAndDraw();
+        }
+
+        function removeRow(index) {
+            if (pricingData.length <= 2) {
+                showToast('⚠️ Minimal 2 titik harga diperlukan untuk analisis.');
+                return;
+            }
+            pricingData.splice(index, 1);
+            computeMath(); renderTable(); calculateAndDraw();
+        }
+
+        function processBulkData() {
+            const text = document.getElementById('bulkInput').value.trim();
+            if (!text) { showToast('Paste data dari Excel terlebih dahulu.'); return; }
+
+            const lines = text.split('\n');
+            let dataMatrix = [];
+            for (let i = 0; i < lines.length; i++) {
+                let sep = lines[i].includes('\t') ? '\t' : (lines[i].includes(',') ? ',' : /\s+/);
+                let cols = lines[i].split(sep).map(v => parseFloat(v.trim()));
+                if (cols.length === 0 || cols.every(isNaN)) continue;
+                dataMatrix.push(cols);
+            }
+            if (dataMatrix.length === 0) { showToast('⚠️ Data tidak valid. Pastikan format angka skala 1–5.'); return; }
+
+            const numCols = dataMatrix[0].length;
+            const getProb = (val) => {
+                if (val > 5) return val;
+                if (val === 5) return 60; if (val === 4) return 40;
+                if (val === 3) return 20; if (val === 2) return 4;
+                if (val === 1) return 2; return 0;
+            };
+
+            let averages = [], margins = [];
+            for (let c = 0; c < numCols; c++) {
+                let sum = 0, count = 0, values = [];
+                for (let r = 0; r < dataMatrix.length; r++) {
+                    let val = dataMatrix[r][c];
+                    if (!isNaN(val)) { let p = getProb(val); sum += p; values.push(p); count++; }
+                }
+                let avg = count > 0 ? sum / count : 0;
+                averages.push(+(avg).toFixed(2));
+                if (count > 1) {
+                    let vs = values.reduce((a, v) => a + Math.pow(v - avg, 2), 0);
+                    let sd = Math.sqrt(vs / (count - 1));
+                    margins.push(+(1.96 * sd / Math.sqrt(count)).toFixed(2));
+                } else { margins.push(0); }
+            }
+
+            while (pricingData.length < numCols) addRow();
+            for (let i = 0; i < numCols; i++) {
+                pricingData[i].probability = averages[i];
+                pricingData[i].margin = margins[i] || 0;
+            }
+            if (pricingData.length > numCols) pricingData.splice(numCols);
+
+            computeMath(); renderTable(); calculateAndDraw();
+            showToast(`✓ Berhasil memproses ${dataMatrix.length} responden dari ${numCols} titik harga.`);
+        }
+
+        const formatRupiah = (n) =>
+            new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(n);
+
+        function calculateAndDraw() {
+            const varCost = parseFloat(document.getElementById('varCost').value) || 0;
+            const marketSize = parseFloat(document.getElementById('marketSize').value) || 1;
+
+            let maxRevenue = -Infinity, optimalPriceRev = 0, maxProfit = -Infinity, optimalPriceProf = 0;
+            let acceptanceAtOptRev = 0;
+            const labels = [], demandData = [], marginData = [], logitData = [], revenueData = [], profitData = [];
+
+            pricingData.forEach(item => {
+                const probDec = item.probability / 100;
+                const unitSold = probDec * marketSize;
+                const revenue = item.price * unitSold;
+                const profit = (item.price - varCost) * unitSold;
+
+                labels.push(formatRupiah(item.price));
+                demandData.push(item.probability);
+                marginData.push(item.margin || 0);
+                logitData.push(item.logit);
+                revenueData.push(revenue);
+                profitData.push(profit);
+
+                if (revenue > maxRevenue) { maxRevenue = revenue; optimalPriceRev = item.price; acceptanceAtOptRev = item.probability; }
+                if (profit > maxProfit) { maxProfit = profit; optimalPriceProf = item.price; }
+            });
+
+            document.getElementById('optimalPriceRev').innerText = formatRupiah(optimalPriceRev);
+            document.getElementById('maxRevenue').innerText = formatRupiah(maxRevenue);
+            document.getElementById('optimalPriceProf').innerText = formatRupiah(optimalPriceProf);
+            document.getElementById('maxProfit').innerText = formatRupiah(maxProfit);
+            document.getElementById('optimalAcceptance').innerText = acceptanceAtOptRev.toFixed(1) + '%';
+
+            // Simple elasticity: avg % change demand / avg % change price
+            let elasticity = 0;
+            if (pricingData.length >= 2) {
+                let pts = [...pricingData].sort((a,b) => a.price - b.price);
+                let sumE = 0, count = 0;
+                for (let i = 1; i < pts.length; i++) {
+                    let dP = (pts[i].price - pts[i-1].price) / pts[i-1].price;
+                    let dQ = (pts[i].probability - pts[i-1].probability) / (pts[i-1].probability || 0.001);
+                    if (dP !== 0) { sumE += dQ / dP; count++; }
+                }
+                elasticity = count > 0 ? sumE / count : 0;
+            }
+            const absE = Math.abs(elasticity).toFixed(2);
+            document.getElementById('elasticityVal').innerText = absE;
+            document.getElementById('elasticityLabel').innerText = Math.abs(elasticity) >= 1 ? 'Elastis (sensitif harga)' : 'Inelastis (tidak sensitif)';
+
+            drawChart(labels, demandData, marginData, logitData, revenueData, profitData);
+        }
+
+        function drawChart(labels, demandData, marginData, logitData, revenueData, profitData) {
+            const upperData = demandData.map((v, i) => Math.min(100, v + marginData[i]));
+            const lowerData = demandData.map((v, i) => Math.max(0, v - marginData[i]));
+            const upperLogit = logitData.map((v, i) => Math.min(100, v + marginData[i]));
+            const lowerLogit = logitData.map((v, i) => Math.max(0, v - marginData[i]));
+
+            const gridColor = 'rgba(148,163,184,0.1)';
+            const tickColor = '#94a3b8';
+
+            // --- Main Chart ---
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(document.getElementById('gaborChart').getContext('2d'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Total Pendapatan (Rp)', type: 'bar', data: revenueData, backgroundColor: 'rgba(41,94,126,0.35)', borderColor: '#295E7E', borderWidth: 1.5, yAxisID: 'y1', borderRadius: 6, order: 2 },
+                        { label: 'Total Profit Bersih (Rp)', type: 'bar', data: profitData, backgroundColor: 'rgba(13,110,79,0.75)', borderColor: '#0D6E4F', borderWidth: 1, yAxisID: 'y1', borderRadius: 6, order: 2 },
+                        { label: 'Batas Atas (Obs)', type: 'line', data: upperData, borderColor: 'rgba(62,173,146,0.25)', borderWidth: 1, borderDash: [4,4], pointRadius: 0, fill: false, yAxisID: 'y', tension: 0.3, order: 1 },
+                        { label: 'Batas Bawah (Obs)', type: 'line', data: lowerData, borderColor: 'rgba(62,173,146,0.25)', borderWidth: 1, borderDash: [4,4], pointRadius: 0, fill: '-1', backgroundColor: 'rgba(62,173,146,0.08)', yAxisID: 'y', tension: 0.3, order: 1 },
+                        { label: 'Probabilitas Pembelian (%)', type: 'line', data: demandData, borderColor: '#2FC898', backgroundColor: '#2FC898', borderWidth: 2.5, pointBackgroundColor: '#fff', pointBorderColor: '#2FC898', pointBorderWidth: 2, pointRadius: 5, pointHoverRadius: 7, fill: false, tension: 0.35, yAxisID: 'y', order: 0 },
+                        { label: 'Batas Atas (Logit)', type: 'line', data: upperLogit, borderColor: 'rgba(245,158,11,0.25)', borderWidth: 1, borderDash: [4,4], pointRadius: 0, fill: false, yAxisID: 'y', tension: 0.4, order: 1 },
+                        { label: 'Batas Bawah (Logit)', type: 'line', data: lowerLogit, borderColor: 'rgba(245,158,11,0.25)', borderWidth: 1, borderDash: [4,4], pointRadius: 0, fill: '-1', backgroundColor: 'rgba(245,158,11,0.06)', yAxisID: 'y', tension: 0.4, order: 1 },
+                        { label: 'Model Logit', type: 'line', data: logitData, borderColor: '#f59e0b', backgroundColor: '#f59e0b', borderWidth: 2, borderDash: [5,5], pointRadius: 3.5, pointHoverRadius: 5, fill: false, tension: 0.4, yAxisID: 'y', order: 0 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        tooltip: {
+                            backgroundColor: 'rgba(15,23,42,0.92)',
+                            titleColor: '#e2e8f0',
+                            bodyColor: '#94a3b8',
+                            borderColor: 'rgba(255,255,255,0.08)',
+                            borderWidth: 1,
+                            padding: 10,
+                            cornerRadius: 10,
+                            callbacks: {
+                                label: (ctx) => {
+                                    let lbl = (ctx.dataset.label || '') + ': ';
+                                    lbl += ctx.dataset.type === 'bar' ? formatRupiah(ctx.raw) : ctx.raw + '%';
+                                    return lbl;
+                                }
+                            }
+                        },
+                        legend: {
+                            position: 'bottom',
+                            labels: { boxWidth: 10, padding: 14, font: { size: 11, family: 'DM Sans' }, color: '#64748b' }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: tickColor, font: { size: 11 } } },
+                        y: {
+                            type: 'linear', position: 'left', min: 0, max: 100,
+                            title: { display: true, text: 'Probabilitas (%)', color: tickColor, font: { size: 11 } },
+                            grid: { color: gridColor, borderDash: [4,4] },
+                            ticks: { color: tickColor, font: { size: 11 } }
+                        },
+                        y1: {
+                            type: 'linear', position: 'right', beginAtZero: true,
+                            title: { display: true, text: 'Nilai (Rp)', color: tickColor, font: { size: 11 } },
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: tickColor, font: { size: 11 }, callback: (v) => formatRupiah(v) }
+                        }
+                    }
+                }
+            });
+
+            const barOptions = (color, borderColor) => ({
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15,23,42,0.92)', titleColor: '#e2e8f0', bodyColor: '#94a3b8',
+                        borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, padding: 10, cornerRadius: 10,
+                        callbacks: { label: (ctx) => formatRupiah(ctx.raw) }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: tickColor, font: { size: 10 } } },
+                    y: { beginAtZero: true, grid: { color: gridColor, borderDash: [4,4] }, ticks: { color: tickColor, font: { size: 10 }, callback: (v) => { if (v >= 1e6) return 'Rp' + (v/1e6).toFixed(1) + 'jt'; return 'Rp' + v.toLocaleString('id'); } } }
+                }
+            });
+
+            // --- Revenue Chart ---
+            if (revenueChartInstance) revenueChartInstance.destroy();
+            revenueChartInstance = new Chart(document.getElementById('revenueChart').getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets: [{ label: 'Pendapatan', data: revenueData, backgroundColor: 'rgba(41,94,126,0.75)', borderColor: '#295E7E', borderWidth: 1, borderRadius: 6 }] },
+                options: barOptions('rgba(41,94,126,0.75)', '#295E7E')
+            });
+
+            // --- Profit Chart ---
+            if (profitChartInstance) profitChartInstance.destroy();
+            profitChartInstance = new Chart(document.getElementById('profitChart').getContext('2d'), {
+                type: 'bar',
+                data: { labels, datasets: [{ label: 'Profit', data: profitData, backgroundColor: 'rgba(13,110,79,0.75)', borderColor: '#0D6E4F', borderWidth: 1, borderRadius: 6 }] },
+                options: barOptions('rgba(13,110,79,0.75)', '#0D6E4F')
+            });
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
